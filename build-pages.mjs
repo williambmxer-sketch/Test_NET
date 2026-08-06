@@ -6,10 +6,25 @@ try {
   const distDir = resolve('dist');
   if (existsSync(clientDir)) {
     const items = readdirSync(clientDir);
+    const excludes = [];
     for (const item of items) {
       cpSync(resolve(clientDir, item), resolve(distDir, item), { recursive: true });
+      const stat = require('fs').statSync(resolve(clientDir, item));
+      if (stat.isDirectory()) {
+        excludes.push(`/${item}/*`);
+      } else {
+        excludes.push(`/${item}`);
+      }
     }
-    console.log('[Pages Adapter] Copied static assets from dist/client to dist/');
+    
+    const routes = {
+      version: 1,
+      include: ["/*"],
+      exclude: excludes
+    };
+    writeFileSync(resolve(distDir, '_routes.json'), JSON.stringify(routes, null, 2));
+    
+    console.log('[Pages Adapter] Copied static assets and generated _routes.json with excludes:', excludes);
   }
 
   const wranglerConfigPath = resolve('dist', 'server', 'wrangler.json');
