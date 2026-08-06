@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.vinext/
+.wrangler/
+dist/
+build/
+.node-v22*
+.git-min*
+*.zip
+*.log
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
