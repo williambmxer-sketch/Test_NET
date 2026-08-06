@@ -1,14 +1,20 @@
-import { readFileSync, copyFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { resolve, dirname, basename } from 'path';
 
 try {
   const wranglerConfigPath = resolve('dist', 'server', 'wrangler.json');
   if (existsSync(wranglerConfigPath)) {
     const w = JSON.parse(readFileSync(wranglerConfigPath, 'utf8'));
-    const mainPath = resolve('dist', 'server', w.main);
+    // w.main is probably 'index.js'. We want to create dist/_worker.js
+    // that imports './server/index.js'
     const targetPath = resolve('dist', '_worker.js');
-    copyFileSync(mainPath, targetPath);
-    console.log(`[Pages Adapter] Copied worker from ${w.main} to dist/_worker.js`);
+    const importPath = `./server/${w.main}`;
+    
+    // Create a proxy worker that exports the original worker
+    const proxyWorkerContent = `import worker from "${importPath}";\nexport default worker;\n`;
+    writeFileSync(targetPath, proxyWorkerContent);
+    
+    console.log(`[Pages Adapter] Created proxy worker at dist/_worker.js importing ${importPath}`);
   } else {
     console.warn("[Pages Adapter] wrangler.json not found in dist/server/");
   }
