@@ -59,23 +59,69 @@ export default function Home() {
   }
 
   async function measureDownload() {
-    const started = performance.now(); let bytes = 0; let n = 0;
-    while (performance.now() - started < 5000) {
-      const res = await fetch(`/api/download?bytes=4000000&n=${n++}`, { cache: "no-store" });
-      const blob = await res.blob(); bytes += blob.size;
-      const mbps = bytes * 8 / ((performance.now() - started) / 1000) / 1_000_000; setDisplay(mbps);
+    const started = performance.now(); 
+    let bytes = 0;
+    let running = true;
+    
+    const timer = setInterval(() => {
+      const elapsed = (performance.now() - started) / 1000;
+      if (elapsed > 0.1) setDisplay(bytes * 8 / elapsed / 1_000_000);
+    }, 100);
+
+    async function streamWorker(id: number) {
+      let n = 0;
+      while (running && performance.now() - started < 5000) {
+        try {
+          const res = await fetch(`/api/download?bytes=12000000&n=${n++}&id=${id}`, { cache: "no-store" });
+          if (!res.body) break;
+          const reader = res.body.getReader();
+          while (running && performance.now() - started < 5000) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) bytes += value.byteLength;
+          }
+          await reader.cancel().catch(()=>{});
+        } catch {}
+      }
     }
-    return bytes * 8 / ((performance.now() - started) / 1000) / 1_000_000;
+
+    Array.from({ length: 6 }, (_, i) => streamWorker(i));
+    await new Promise(r => setTimeout(r, 5000));
+    running = false;
+    clearInterval(timer);
+    
+    const elapsed = (performance.now() - started) / 1000;
+    return bytes * 8 / Math.max(elapsed, 0.1) / 1_000_000;
   }
 
   async function measureUpload() {
     const payload = new Uint8Array(2_000_000); crypto.getRandomValues(payload.subarray(0, 65536));
-    const started = performance.now(); let bytes = 0;
-    while (performance.now() - started < 4000) {
-      const res = await fetch("/api/upload", { method: "POST", body: payload }); if (!res.ok) throw new Error(); bytes += payload.byteLength;
-      setDisplay(bytes * 8 / ((performance.now() - started) / 1000) / 1_000_000);
+    const started = performance.now(); 
+    let bytes = 0;
+    let running = true;
+    
+    const timer = setInterval(() => {
+      const elapsed = (performance.now() - started) / 1000;
+      if (elapsed > 0.1) setDisplay(bytes * 8 / elapsed / 1_000_000);
+    }, 100);
+
+    async function streamWorker() {
+      while (running && performance.now() - started < 5000) {
+        try {
+          const res = await fetch(`/api/upload?_t=${Date.now()}-${Math.random()}`, { method: "POST", body: payload, cache: "no-store" }); 
+          if (!res.ok) throw new Error(); 
+          if (running) bytes += payload.byteLength;
+        } catch {}
+      }
     }
-    return bytes * 8 / ((performance.now() - started) / 1000) / 1_000_000;
+
+    Array.from({ length: 6 }, () => streamWorker());
+    await new Promise(r => setTimeout(r, 5000));
+    running = false;
+    clearInterval(timer);
+    
+    const elapsed = (performance.now() - started) / 1000;
+    return bytes * 8 / Math.max(elapsed, 0.1) / 1_000_000;
   }
 
   async function start() {
