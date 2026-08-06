@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, cpSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, cpSync, readdirSync, statSync } from 'fs';
 import { resolve, dirname, basename } from 'path';
 
 try {
@@ -9,7 +9,7 @@ try {
     const excludes = [];
     for (const item of items) {
       cpSync(resolve(clientDir, item), resolve(distDir, item), { recursive: true });
-      const stat = require('fs').statSync(resolve(clientDir, item));
+      const stat = statSync(resolve(clientDir, item));
       if (stat.isDirectory()) {
         excludes.push(`/${item}/*`);
       } else {
