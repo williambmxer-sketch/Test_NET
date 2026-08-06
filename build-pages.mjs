@@ -1,7 +1,17 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, cpSync, readdirSync } from 'fs';
 import { resolve, dirname, basename } from 'path';
 
 try {
+  const clientDir = resolve('dist', 'client');
+  const distDir = resolve('dist');
+  if (existsSync(clientDir)) {
+    const items = readdirSync(clientDir);
+    for (const item of items) {
+      cpSync(resolve(clientDir, item), resolve(distDir, item), { recursive: true });
+    }
+    console.log('[Pages Adapter] Copied static assets from dist/client to dist/');
+  }
+
   const wranglerConfigPath = resolve('dist', 'server', 'wrangler.json');
   if (existsSync(wranglerConfigPath)) {
     const w = JSON.parse(readFileSync(wranglerConfigPath, 'utf8'));
