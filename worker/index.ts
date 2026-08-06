@@ -35,12 +35,12 @@ const worker = {
 
     if (url.pathname === "/api/download") {
       const size = Math.min(Number(url.searchParams.get("bytes")) || 4_000_000, 12_000_000);
-      return new Response(new Uint8Array(size), { headers: { "content-type": "application/octet-stream", "cache-control": "no-store", "content-length": String(size) } });
+      return new Response(new Uint8Array(size), { headers: { "content-type": "application/octet-stream", "cache-control": "no-store, no-transform", "content-length": String(size) } });
     }
 
     if (url.pathname === "/api/upload" && request.method === "POST") {
       const body = await request.arrayBuffer();
-      return Response.json({ received: body.byteLength }, { headers: { "cache-control": "no-store" } });
+      return Response.json({ received: body.byteLength }, { headers: { "cache-control": "no-store, no-transform" } });
     }
 
     if (url.pathname === "/api/info") {
