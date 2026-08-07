@@ -47,7 +47,6 @@ export default function Home() {
   const [result, setResult] = useState<Result>(initial);
   const [display, setDisplay] = useState(0);
   const [info, setInfo] = useState<NetInfo>({});
-  const [historyPing, setHistoryPing] = useState<number[]>([]);
   const [historyDl, setHistoryDl] = useState<number[]>([]);
   const [historyUl, setHistoryUl] = useState<number[]>([]);
   const running = useRef(false);
@@ -69,7 +68,6 @@ export default function Home() {
         const lat = performance.now() - t;
         samples.push(lat); 
         setDisplay(lat); 
-        setHistoryPing([...samples]);
       }
       catch { failed++; }
       await new Promise(r => setTimeout(r, 50));
@@ -181,7 +179,7 @@ export default function Home() {
 
   async function start() {
     if (running.current) return; running.current = true; setResult(initial);
-    setHistoryPing([]); setHistoryDl([]); setHistoryUl([]);
+    setHistoryDl([]); setHistoryUl([]);
     try {
       setPhase("ping"); setDisplay(0); const latency = await measurePing(); setResult(r => ({...r,...latency}));
       setPhase("download"); setDisplay(0); const download = await measureDownload(); setResult(r => ({...r,download}));
@@ -256,42 +254,42 @@ export default function Home() {
     <section className="metrics">
       <article><span className="metricIcon">↓</span><div><small>DOWNLOAD</small><strong>{result.download ? result.download.toFixed(1) : "—"}<i> Mbps</i></strong></div></article>
       <article><span className="metricIcon">↑</span><div><small>UPLOAD</small><strong>{result.upload ? result.upload.toFixed(1) : "—"}<i> Mbps</i></strong></div></article>
-      <article><span className="metricIcon">⌁</span><div><small>PING</small><strong>{result.ping ? Math.round(result.ping) : "—"}<i> ms</i></strong><p>Jitter {result.jitter ? result.jitter.toFixed(1) : "—"} ms</p></div></article>
-      <article><span className="metricIcon">◇</span><div><small>PERDA</small><strong>{phase === "done" ? result.loss.toFixed(1) : "—"}<i>%</i></strong></div></article>
+    </section>
+
+    <section className="latencyBar">
+      <div className="latItem">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3L2 6"/><path d="M19 3l3 3"/><path d="M12 2v2"/></svg>
+        <div className="latText">
+          <strong>{result.ping ? Math.round(result.ping) : "—"} ms</strong>
+          <small>Latência</small>
+        </div>
+      </div>
+      <div className="latItem">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <div className="latText">
+          <strong>{result.jitter ? result.jitter.toFixed(1) : "—"} ms</strong>
+          <small>Jitter</small>
+        </div>
+      </div>
+      <div className="latItem">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        <div className="latText">
+          <strong>{phase === "done" ? result.loss.toFixed(1) : "—"} %</strong>
+          <small>Perda de Pacotes</small>
+        </div>
+      </div>
     </section>
     
     <section className="chartSection">
       <div className="chartHeader">
         <p className="eyebrow">ESTABILIDADE DE REDE</p>
         <div className="chartLegend">
-          <span className="legendPing"><i></i> Ping</span>
           <span className="legendDl"><i></i> Download</span>
           <span className="legendUl"><i></i> Upload</span>
         </div>
       </div>
       <div className="chartGridContainer">
         
-        {/* Ping Chart */}
-        <div className="chartWrapper">
-          <div className="chartGrid">
-            <span/> <span/> <span/> <span/> <span/>
-          </div>
-          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="chartSvgData">
-            <defs>
-              <linearGradient id="pingGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="rgba(139, 92, 246, 0.35)" />
-                <stop offset="100%" stopColor="rgba(139, 92, 246, 0)" />
-              </linearGradient>
-            </defs>
-            {historyPing.length > 0 && (
-              <>
-                <path d={buildPath(historyPing, 1000, 200, 0, 30, true)} fill="url(#pingGrad)" />
-                <path d={buildPath(historyPing, 1000, 200, 0, 30, false)} fill="none" stroke="#8b5cf6" strokeWidth="6" strokeLinejoin="round" />
-              </>
-            )}
-          </svg>
-        </div>
-
         {/* Download Chart */}
         <div className="chartWrapper">
           <div className="chartGrid">

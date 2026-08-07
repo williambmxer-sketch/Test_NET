@@ -446,7 +446,47 @@ button:hover b svg {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.latencyBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #09090b;
+  color: #ffffff;
+  padding: 24px 40px;
+  border-radius: 16px;
+  margin: 40px 0;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.latItem {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.latItem svg {
+  color: #ffffff;
+}
+
+.latText {
+  display: flex;
+  flex-direction: column;
+}
+
+.latText strong {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-geist-mono);
+}
+
+.latText small {
+  font-size: 13px;
+  color: #a1a1aa;
+  font-weight: 500;
+  margin-top: 2px;
 }
 
 .metrics article {
@@ -537,17 +577,21 @@ button:hover b svg {
 
 .legendDl i { background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
 .legendUl i { background: #3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4); }
-.legendPing i { background: #8b5cf6; box-shadow: 0 0 8px rgba(139, 92, 246, 0.4); }
 
 .chartGridContainer {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
 
 @media (max-width: 900px) {
   .chartGridContainer {
     grid-template-columns: 1fr;
+  }
+  .latencyBar {
+    flex-direction: column;
+    gap: 24px;
+    align-items: flex-start;
   }
 }
 
