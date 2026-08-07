@@ -113,7 +113,7 @@ export default function Home() {
   }
 
   async function measureUpload() {
-    const payload = new Uint8Array(5_000_000); crypto.getRandomValues(payload.subarray(0, 65536));
+    const payload = new Uint8Array(1_000_000); crypto.getRandomValues(payload.subarray(0, 65536));
     const started = performance.now(); 
     let bytes = 0;
     let running = true;
