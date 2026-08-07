@@ -9,6 +9,15 @@ type NetInfo = { ip?: string; provider?: string; city?: string; region?: string;
 const initial: Result = { ping: 0, jitter: 0, download: 0, upload: 0, loss: 0 };
 const labels: Record<Phase, string> = { idle: "Pronto para medir", ping: "Medindo latência", download: "Medindo download", upload: "Medindo upload", done: "Teste concluído" };
 
+function buildPath(data: number[], w: number, h: number, maxVal: number, isArea: boolean) {
+  if (!data.length) return "";
+  const max = (maxVal || Math.max(...data, 10)) * 1.05; // 5% padding top
+  const totalPoints = 100; // 10s at 100ms
+  const pts = data.map((val, i) => `${(i / totalPoints) * w},${h - (val / max) * h}`);
+  if (isArea) return `M 0,${h} L ${pts.join(" L ")} L ${( (data.length - 1) / totalPoints ) * w},${h} Z`;
+  return `M ${pts.join(" L ")}`;
+}
+
 function quality(r: Result) {
   if (!r.download) return { label: "—", score: 0, tone: "neutral" };
   let score = 100;
@@ -38,6 +47,8 @@ export default function Home() {
   const [result, setResult] = useState<Result>(initial);
   const [display, setDisplay] = useState(0);
   const [info, setInfo] = useState<NetInfo>({});
+  const [historyDl, setHistoryDl] = useState<number[]>([]);
+  const [historyUl, setHistoryUl] = useState<number[]>([]);
   const running = useRef(false);
   const q = useMemo(() => quality(result), [result]);
   const max = phase === "ping" ? 200 : 2000;
@@ -62,10 +73,16 @@ export default function Home() {
     const started = performance.now(); 
     let bytes = 0;
     let running = true;
+    let localHist: number[] = [];
     
     const timer = setInterval(() => {
       const elapsed = (performance.now() - started) / 1000;
-      if (elapsed > 0.1) setDisplay(bytes * 8 / elapsed / 1_000_000);
+      if (elapsed > 0.1) {
+        const speed = bytes * 8 / elapsed / 1_000_000;
+        setDisplay(speed);
+        localHist.push(speed);
+        setHistoryDl([...localHist]);
+      }
     }, 100);
 
     async function streamWorker(id: number) {
@@ -99,10 +116,16 @@ export default function Home() {
     const started = performance.now(); 
     let bytes = 0;
     let running = true;
+    let localHist: number[] = [];
     
     const timer = setInterval(() => {
       const elapsed = (performance.now() - started) / 1000;
-      if (elapsed > 0.1) setDisplay(bytes * 8 / elapsed / 1_000_000);
+      if (elapsed > 0.1) {
+        const speed = bytes * 8 / elapsed / 1_000_000;
+        setDisplay(speed);
+        localHist.push(speed);
+        setHistoryUl([...localHist]);
+      }
     }, 100);
 
     async function streamWorker() {
@@ -126,6 +149,7 @@ export default function Home() {
 
   async function start() {
     if (running.current) return; running.current = true; setResult(initial);
+    setHistoryDl([]); setHistoryUl([]);
     try {
       setPhase("ping"); setDisplay(0); const latency = await measurePing(); setResult(r => ({...r,...latency}));
       setPhase("download"); setDisplay(0); const download = await measureDownload(); setResult(r => ({...r,download}));
@@ -198,6 +222,46 @@ export default function Home() {
       <article><span className="metricIcon">↑</span><div><small>UPLOAD</small><strong>{result.upload ? result.upload.toFixed(1) : "—"}<i> Mbps</i></strong></div></article>
       <article><span className="metricIcon">⌁</span><div><small>PING</small><strong>{result.ping ? Math.round(result.ping) : "—"}<i> ms</i></strong><p>Jitter {result.jitter ? result.jitter.toFixed(1) : "—"} ms</p></div></article>
       <article><span className="metricIcon">◇</span><div><small>PERDA</small><strong>{phase === "done" ? result.loss.toFixed(1) : "—"}<i>%</i></strong></div></article>
+    </section>
+    
+    <section className="chartSection">
+      <div className="chartHeader">
+        <p className="eyebrow">ESTABILIDADE DE REDE</p>
+        <div className="chartLegend">
+          <span className="legendDl"><i></i> Download</span>
+          <span className="legendUl"><i></i> Upload</span>
+        </div>
+      </div>
+      <div className="chartWrapper">
+        <div className="chartGrid">
+          <span/> <span/> <span/> <span/> <span/>
+        </div>
+        <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="chartSvgData">
+          <defs>
+            <linearGradient id="dlGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(16, 185, 129, 0.35)" />
+              <stop offset="100%" stopColor="rgba(16, 185, 129, 0)" />
+            </linearGradient>
+            <linearGradient id="ulGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(59, 130, 246, 0.35)" />
+              <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
+            </linearGradient>
+          </defs>
+          
+          {historyDl.length > 0 && (
+            <>
+              <path d={buildPath(historyDl, 1000, 200, max, true)} fill="url(#dlGrad)" />
+              <path d={buildPath(historyDl, 1000, 200, max, false)} fill="none" stroke="#10b981" strokeWidth="4" strokeLinejoin="round" />
+            </>
+          )}
+          {historyUl.length > 0 && (
+            <>
+              <path d={buildPath(historyUl, 1000, 200, max, true)} fill="url(#ulGrad)" />
+              <path d={buildPath(historyUl, 1000, 200, max, false)} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinejoin="round" />
+            </>
+          )}
+        </svg>
+      </div>
     </section>
     <section className="details">
       <div className="connection"><p className="eyebrow">SUA CONEXÃO</p><h2>{info.provider || "Provedor será identificado"}</h2><div className="infoGrid"><p><span>IP PÚBLICO</span>{info.ip || "Detectando..."}</p><p><span>LOCALIZAÇÃO</span>{[info.city,info.region,info.country].filter(Boolean).join(", ") || "Detectando..."}</p><p><span>SERVIDOR</span>{info.colo ? `Cloudflare ${info.colo}` : "Cloudflare Edge"}</p><p><span>PROTOCOLO</span>HTTPS seguro</p></div></div>
