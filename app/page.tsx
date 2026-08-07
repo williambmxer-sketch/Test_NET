@@ -55,7 +55,7 @@ export default function Home() {
   const gaugeValue = phase === "ping" ? display : phase === "upload" ? display : phase === "done" ? result.download : display;
   const angle = -90 + Math.min(1, Math.max(0, gaugeValue / max)) * 180;
 
-  useEffect(() => { fetch("/api/info").then(r => r.json()).then(setInfo).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/info").then(r => r.json()).then((data: any) => setInfo(data)).catch(() => {}); }, []);
 
   async function measurePing() {
     const samples: number[] = []; let failed = 0;
