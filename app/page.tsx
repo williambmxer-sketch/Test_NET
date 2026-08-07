@@ -250,14 +250,14 @@ export default function Home() {
           
           {historyDl.length > 0 && (
             <>
-              <path d={buildPath(historyDl, 1000, 200, max, true)} fill="url(#dlGrad)" />
-              <path d={buildPath(historyDl, 1000, 200, max, false)} fill="none" stroke="#10b981" strokeWidth="4" strokeLinejoin="round" />
+              <path d={buildPath(historyDl, 1000, 200, 0, true)} fill="url(#dlGrad)" />
+              <path d={buildPath(historyDl, 1000, 200, 0, false)} fill="none" stroke="#10b981" strokeWidth="4" strokeLinejoin="round" />
             </>
           )}
           {historyUl.length > 0 && (
             <>
-              <path d={buildPath(historyUl, 1000, 200, max, true)} fill="url(#ulGrad)" />
-              <path d={buildPath(historyUl, 1000, 200, max, false)} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinejoin="round" />
+              <path d={buildPath(historyUl, 1000, 200, 0, true)} fill="url(#ulGrad)" />
+              <path d={buildPath(historyUl, 1000, 200, 0, false)} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinejoin="round" />
             </>
           )}
         </svg>
