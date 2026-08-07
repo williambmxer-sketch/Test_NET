@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
@@ -25,6 +26,9 @@ interface ExecutionContext {
 // dangerouslyAllowSVG: true in next.config.js and uncomment below:
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
+// Pre-allocate a 25MB buffer globally to avoid RAM exhaustion on high-speed concurrent tests
+const DOWNLOAD_BUFFER = new Uint8Array(25_000_000);
+
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -34,13 +38,22 @@ const worker = {
     }
 
     if (url.pathname === "/api/download") {
-      const size = Math.min(Number(url.searchParams.get("bytes")) || 4_000_000, 12_000_000);
-      return new Response(new Uint8Array(size), { headers: { "content-type": "application/octet-stream", "cache-control": "no-store, no-transform", "content-length": String(size) } });
+      const size = Math.min(Number(url.searchParams.get("bytes")) || 4_000_000, 25_000_000);
+      const data = size === 25_000_000 ? DOWNLOAD_BUFFER : DOWNLOAD_BUFFER.subarray(0, size);
+      return new Response(data, { headers: { "content-type": "application/octet-stream", "cache-control": "no-store, no-transform", "content-length": String(size) } });
     }
 
     if (url.pathname === "/api/upload" && request.method === "POST") {
-      const body = await request.arrayBuffer();
-      return Response.json({ received: body.byteLength }, { headers: { "cache-control": "no-store, no-transform" } });
+      let received = 0;
+      if (request.body) {
+        const reader = request.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) received += value.byteLength;
+        }
+      }
+      return Response.json({ received }, { headers: { "cache-control": "no-store, no-transform" } });
     }
 
     if (url.pathname === "/api/info") {

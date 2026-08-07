@@ -70,12 +70,12 @@ export default function Home() {
 
     async function streamWorker(id: number) {
       let n = 0;
-      while (running && performance.now() - started < 5000) {
+      while (running && performance.now() - started < 10000) {
         try {
-          const res = await fetch(`/api/download?bytes=12000000&n=${n++}&id=${id}`, { cache: "no-store" });
+          const res = await fetch(`/api/download?bytes=25000000&n=${n++}&id=${id}`, { cache: "no-store" });
           if (!res.body) break;
           const reader = res.body.getReader();
-          while (running && performance.now() - started < 5000) {
+          while (running && performance.now() - started < 10000) {
             const { done, value } = await reader.read();
             if (done) break;
             if (value) bytes += value.byteLength;
@@ -86,7 +86,7 @@ export default function Home() {
     }
 
     Array.from({ length: 6 }, (_, i) => streamWorker(i));
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(r => setTimeout(r, 10000));
     running = false;
     clearInterval(timer);
     
@@ -95,7 +95,7 @@ export default function Home() {
   }
 
   async function measureUpload() {
-    const payload = new Uint8Array(2_000_000); crypto.getRandomValues(payload.subarray(0, 65536));
+    const payload = new Uint8Array(5_000_000); crypto.getRandomValues(payload.subarray(0, 65536));
     const started = performance.now(); 
     let bytes = 0;
     let running = true;
@@ -106,7 +106,7 @@ export default function Home() {
     }, 100);
 
     async function streamWorker() {
-      while (running && performance.now() - started < 5000) {
+      while (running && performance.now() - started < 10000) {
         try {
           const res = await fetch(`/api/upload?_t=${Date.now()}-${Math.random()}`, { method: "POST", body: payload, cache: "no-store" }); 
           if (!res.ok) throw new Error(); 
@@ -116,7 +116,7 @@ export default function Home() {
     }
 
     Array.from({ length: 6 }, () => streamWorker());
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(r => setTimeout(r, 10000));
     running = false;
     clearInterval(timer);
     
@@ -169,14 +169,10 @@ export default function Home() {
             )}
           </svg>
           {phase !== "ping" && result.download > 0 && (
-            <div className="markerPin downloadPin" style={{ transform: `rotate(${angleDlPin}deg)` }}>
-              <span className="pinLabel">↓ {Math.round(result.download)}</span>
-            </div>
+            <div className="markerPin downloadPin" style={{ transform: `rotate(${angleDlPin}deg)` }} />
           )}
           {phase !== "ping" && result.upload > 0 && (
-            <div className="markerPin uploadPin" style={{ transform: `rotate(${angleUlPin}deg)` }}>
-              <span className="pinLabel">↑ {Math.round(result.upload)}</span>
-            </div>
+            <div className="markerPin uploadPin" style={{ transform: `rotate(${angleUlPin}deg)` }} />
           )}
           <div className="needle" style={{ transform: `rotate(${angle}deg)` }}><span/></div>
           <div className="hub"/>
