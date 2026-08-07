@@ -11,8 +11,7 @@ const labels: Record<Phase, string> = { idle: "Pronto para medir", ping: "Medind
 
 function buildPath(data: number[], w: number, h: number, maxVal: number, isArea: boolean) {
   if (!data.length) return "";
-  const avg = data.reduce((a, b) => a + b, 0) / data.length;
-  const max = maxVal || Math.max(avg * 2, 10);
+  const max = maxVal || 10;
   const totalPoints = 100; // 10s at 100ms
   const pts = data.map((val, i) => `${(i / totalPoints) * w},${h - (Math.min(val, max) / max) * h}`);
   if (isArea) return `M 0,${h} L ${pts.join(" L ")} L ${( (data.length - 1) / totalPoints ) * w},${h} Z`;
@@ -115,37 +114,59 @@ export default function Home() {
   async function measureUpload() {
     const payload = new Uint8Array(1_000_000); crypto.getRandomValues(payload.subarray(0, 65536));
     const started = performance.now(); 
-    let bytes = 0;
     let running = true;
     let localHist: number[] = [];
+    
+    let totalCompletedBytes = 0;
+    const workerCurrentBytes = new Array(6).fill(0);
     
     const timer = setInterval(() => {
       const elapsed = (performance.now() - started) / 1000;
       if (elapsed > 0.1) {
-        const speed = bytes * 8 / elapsed / 1_000_000;
+        const currentInflight = workerCurrentBytes.reduce((a, b) => a + b, 0);
+        const speed = (totalCompletedBytes + currentInflight) * 8 / elapsed / 1_000_000;
         setDisplay(speed);
         localHist.push(speed);
         setHistoryUl([...localHist]);
       }
     }, 100);
 
-    async function streamWorker() {
-      while (running && performance.now() - started < 10000) {
-        try {
-          const res = await fetch(`/api/upload?_t=${Date.now()}-${Math.random()}`, { method: "POST", body: payload, cache: "no-store" }); 
-          if (!res.ok) throw new Error(); 
-          if (running) bytes += payload.byteLength;
-        } catch {}
-      }
+    function streamWorker(id: number) {
+      return new Promise<void>((resolve) => {
+        function runNext() {
+          if (!running || performance.now() - started >= 10000) return resolve();
+          
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", `/api/upload?_t=${Date.now()}-${Math.random()}`);
+          
+          xhr.upload.onprogress = (e) => {
+            if (running) workerCurrentBytes[id] = e.loaded;
+          };
+          
+          xhr.onload = xhr.onerror = () => {
+            if (running) {
+              totalCompletedBytes += payload.byteLength;
+              workerCurrentBytes[id] = 0;
+              runNext();
+            } else {
+              resolve();
+            }
+          };
+          
+          xhr.send(payload);
+        }
+        runNext();
+      });
     }
 
-    Array.from({ length: 6 }, () => streamWorker());
+    Array.from({ length: 6 }, (_, i) => streamWorker(i));
     await new Promise(r => setTimeout(r, 10000));
     running = false;
     clearInterval(timer);
     
     const elapsed = (performance.now() - started) / 1000;
-    return bytes * 8 / Math.max(elapsed, 0.1) / 1_000_000;
+    const finalBytes = totalCompletedBytes + workerCurrentBytes.reduce((a, b) => a + b, 0);
+    return finalBytes * 8 / Math.max(elapsed, 0.1) / 1_000_000;
   }
 
   async function start() {
@@ -173,6 +194,10 @@ export default function Home() {
 
   const angleDlPin = -90 + Math.min(1, Math.max(0, result.download / max)) * 180;
   const angleUlPin = -90 + Math.min(1, Math.max(0, result.upload / max)) * 180;
+
+  const dlAvg = historyDl.length ? historyDl.reduce((a,b)=>a+b,0)/historyDl.length : 0;
+  const ulAvg = historyUl.length ? historyUl.reduce((a,b)=>a+b,0)/historyUl.length : 0;
+  const sharedMax = Math.max(dlAvg * 2, ulAvg * 2, 10);
 
   return <main>
     <nav><div className="brand"><span className="brandMark">N</span><span>NÍVEL<span className="accent">NET</span></span></div><span className="live"><i/> diagnóstico ao vivo</span></nav>
@@ -251,14 +276,14 @@ export default function Home() {
           
           {historyDl.length > 0 && (
             <>
-              <path d={buildPath(historyDl, 1000, 200, 0, true)} fill="url(#dlGrad)" />
-              <path d={buildPath(historyDl, 1000, 200, 0, false)} fill="none" stroke="#10b981" strokeWidth="4" strokeLinejoin="round" />
+              <path d={buildPath(historyDl, 1000, 200, sharedMax, true)} fill="url(#dlGrad)" />
+              <path d={buildPath(historyDl, 1000, 200, sharedMax, false)} fill="none" stroke="#10b981" strokeWidth="4" strokeLinejoin="round" />
             </>
           )}
           {historyUl.length > 0 && (
             <>
-              <path d={buildPath(historyUl, 1000, 200, 0, true)} fill="url(#ulGrad)" />
-              <path d={buildPath(historyUl, 1000, 200, 0, false)} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinejoin="round" />
+              <path d={buildPath(historyUl, 1000, 200, sharedMax, true)} fill="url(#ulGrad)" />
+              <path d={buildPath(historyUl, 1000, 200, sharedMax, false)} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinejoin="round" />
             </>
           )}
         </svg>
