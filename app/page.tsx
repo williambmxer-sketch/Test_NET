@@ -11,9 +11,10 @@ const labels: Record<Phase, string> = { idle: "Pronto para medir", ping: "Medind
 
 function buildPath(data: number[], w: number, h: number, maxVal: number, isArea: boolean) {
   if (!data.length) return "";
-  const max = (maxVal || Math.max(...data, 10)) * 1.05; // 5% padding top
+  const avg = data.reduce((a, b) => a + b, 0) / data.length;
+  const max = maxVal || Math.max(avg * 2, 10);
   const totalPoints = 100; // 10s at 100ms
-  const pts = data.map((val, i) => `${(i / totalPoints) * w},${h - (val / max) * h}`);
+  const pts = data.map((val, i) => `${(i / totalPoints) * w},${h - (Math.min(val, max) / max) * h}`);
   if (isArea) return `M 0,${h} L ${pts.join(" L ")} L ${( (data.length - 1) / totalPoints ) * w},${h} Z`;
   return `M ${pts.join(" L ")}`;
 }
