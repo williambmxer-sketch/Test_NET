@@ -537,6 +537,19 @@ button:hover b svg {
 
 .legendDl i { background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
 .legendUl i { background: #3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4); }
+.legendPing i { background: #8b5cf6; box-shadow: 0 0 8px rgba(139, 92, 246, 0.4); }
+
+.chartGridContainer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .chartGridContainer {
+    grid-template-columns: 1fr;
+  }
+}
 
 .chartWrapper {
   position: relative;

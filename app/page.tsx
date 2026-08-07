@@ -9,10 +9,10 @@ type NetInfo = { ip?: string; provider?: string; city?: string; region?: string;
 const initial: Result = { ping: 0, jitter: 0, download: 0, upload: 0, loss: 0 };
 const labels: Record<Phase, string> = { idle: "Pronto para medir", ping: "Medindo latência", download: "Medindo download", upload: "Medindo upload", done: "Teste concluído" };
 
-function buildPath(data: number[], w: number, h: number, maxVal: number, isArea: boolean) {
+function buildPath(data: number[], w: number, h: number, maxVal: number, expectedPoints: number, isArea: boolean) {
   if (!data.length) return "";
   const max = maxVal || 10;
-  const totalPoints = 100; // 10s at 100ms
+  const totalPoints = expectedPoints > 0 ? expectedPoints : Math.max(data.length - 1, 1);
   const pts = data.map((val, i) => `${(i / totalPoints) * w},${h - (Math.min(val, max) / max) * h}`);
   if (isArea) return `M 0,${h} L ${pts.join(" L ")} L ${( (data.length - 1) / totalPoints ) * w},${h} Z`;
   return `M ${pts.join(" L ")}`;
@@ -47,6 +47,7 @@ export default function Home() {
   const [result, setResult] = useState<Result>(initial);
   const [display, setDisplay] = useState(0);
   const [info, setInfo] = useState<NetInfo>({});
+  const [historyPing, setHistoryPing] = useState<number[]>([]);
   const [historyDl, setHistoryDl] = useState<number[]>([]);
   const [historyUl, setHistoryUl] = useState<number[]>([]);
   const running = useRef(false);
@@ -59,14 +60,23 @@ export default function Home() {
 
   async function measurePing() {
     const samples: number[] = []; let failed = 0;
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 30; i++) {
       const t = performance.now();
-      try { const res = await fetch(`/api/ping?t=${Date.now()}-${i}`, { cache: "no-store" }); if (!res.ok) throw new Error(); await res.text(); samples.push(performance.now() - t); setDisplay(samples.at(-1) || 0); }
+      try { 
+        const res = await fetch(`/api/ping?t=${Date.now()}-${i}`, { cache: "no-store" }); 
+        if (!res.ok) throw new Error(); 
+        await res.text(); 
+        const lat = performance.now() - t;
+        samples.push(lat); 
+        setDisplay(lat); 
+        setHistoryPing([...samples]);
+      }
       catch { failed++; }
+      await new Promise(r => setTimeout(r, 50));
     }
     const avg = samples.reduce((a,b)=>a+b,0) / Math.max(1,samples.length);
     const jitter = samples.length > 1 ? samples.slice(1).reduce((a,v,i)=>a+Math.abs(v-samples[i]),0)/(samples.length-1) : 0;
-    return { ping: avg, jitter, loss: failed / 12 * 100 };
+    return { ping: avg, jitter, loss: failed / 30 * 100 };
   }
 
   async function measureDownload() {
@@ -171,7 +181,7 @@ export default function Home() {
 
   async function start() {
     if (running.current) return; running.current = true; setResult(initial);
-    setHistoryDl([]); setHistoryUl([]);
+    setHistoryPing([]); setHistoryDl([]); setHistoryUl([]);
     try {
       setPhase("ping"); setDisplay(0); const latency = await measurePing(); setResult(r => ({...r,...latency}));
       setPhase("download"); setDisplay(0); const download = await measureDownload(); setResult(r => ({...r,download}));
@@ -254,39 +264,76 @@ export default function Home() {
       <div className="chartHeader">
         <p className="eyebrow">ESTABILIDADE DE REDE</p>
         <div className="chartLegend">
+          <span className="legendPing"><i></i> Ping</span>
           <span className="legendDl"><i></i> Download</span>
           <span className="legendUl"><i></i> Upload</span>
         </div>
       </div>
-      <div className="chartWrapper">
-        <div className="chartGrid">
-          <span/> <span/> <span/> <span/> <span/>
+      <div className="chartGridContainer">
+        
+        {/* Ping Chart */}
+        <div className="chartWrapper">
+          <div className="chartGrid">
+            <span/> <span/> <span/> <span/> <span/>
+          </div>
+          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="chartSvgData">
+            <defs>
+              <linearGradient id="pingGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgba(139, 92, 246, 0.35)" />
+                <stop offset="100%" stopColor="rgba(139, 92, 246, 0)" />
+              </linearGradient>
+            </defs>
+            {historyPing.length > 0 && (
+              <>
+                <path d={buildPath(historyPing, 1000, 200, 0, 30, true)} fill="url(#pingGrad)" />
+                <path d={buildPath(historyPing, 1000, 200, 0, 30, false)} fill="none" stroke="#8b5cf6" strokeWidth="6" strokeLinejoin="round" />
+              </>
+            )}
+          </svg>
         </div>
-        <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="chartSvgData">
-          <defs>
-            <linearGradient id="dlGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgba(16, 185, 129, 0.35)" />
-              <stop offset="100%" stopColor="rgba(16, 185, 129, 0)" />
-            </linearGradient>
-            <linearGradient id="ulGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgba(59, 130, 246, 0.35)" />
-              <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
-            </linearGradient>
-          </defs>
-          
-          {historyDl.length > 0 && (
-            <>
-              <path d={buildPath(historyDl, 1000, 200, sharedMax, true)} fill="url(#dlGrad)" />
-              <path d={buildPath(historyDl, 1000, 200, sharedMax, false)} fill="none" stroke="#10b981" strokeWidth="4" strokeLinejoin="round" />
-            </>
-          )}
-          {historyUl.length > 0 && (
-            <>
-              <path d={buildPath(historyUl, 1000, 200, sharedMax, true)} fill="url(#ulGrad)" />
-              <path d={buildPath(historyUl, 1000, 200, sharedMax, false)} fill="none" stroke="#3b82f6" strokeWidth="4" strokeLinejoin="round" />
-            </>
-          )}
-        </svg>
+
+        {/* Download Chart */}
+        <div className="chartWrapper">
+          <div className="chartGrid">
+            <span/> <span/> <span/> <span/> <span/>
+          </div>
+          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="chartSvgData">
+            <defs>
+              <linearGradient id="dlGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgba(16, 185, 129, 0.35)" />
+                <stop offset="100%" stopColor="rgba(16, 185, 129, 0)" />
+              </linearGradient>
+            </defs>
+            {historyDl.length > 0 && (
+              <>
+                <path d={buildPath(historyDl, 1000, 200, sharedMax, 100, true)} fill="url(#dlGrad)" />
+                <path d={buildPath(historyDl, 1000, 200, sharedMax, 100, false)} fill="none" stroke="#10b981" strokeWidth="6" strokeLinejoin="round" />
+              </>
+            )}
+          </svg>
+        </div>
+
+        {/* Upload Chart */}
+        <div className="chartWrapper">
+          <div className="chartGrid">
+            <span/> <span/> <span/> <span/> <span/>
+          </div>
+          <svg viewBox="0 0 1000 200" preserveAspectRatio="none" className="chartSvgData">
+            <defs>
+              <linearGradient id="ulGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgba(59, 130, 246, 0.35)" />
+                <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
+              </linearGradient>
+            </defs>
+            {historyUl.length > 0 && (
+              <>
+                <path d={buildPath(historyUl, 1000, 200, sharedMax, 100, true)} fill="url(#ulGrad)" />
+                <path d={buildPath(historyUl, 1000, 200, sharedMax, 100, false)} fill="none" stroke="#3b82f6" strokeWidth="6" strokeLinejoin="round" />
+              </>
+            )}
+          </svg>
+        </div>
+
       </div>
     </section>
     <section className="details">
